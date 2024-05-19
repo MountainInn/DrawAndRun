@@ -15,7 +15,6 @@ namespace Dreamteck
         public bool shift = false;
         public bool alt = false;
         public bool enterDown = false;
-        public bool v = false;
         public Vector2 mousPos = Vector2.zero;
         public Vector2 lastClickPoint = Vector2.zero;
         public Vector2 mouseClickDelta
@@ -99,12 +98,10 @@ namespace Dreamteck
                 case EventType.KeyDown:
                     if (onkeyDown != null) onkeyDown(e.keyCode);
                     if (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter) enterDown = true;
-                    if (e.keyCode == KeyCode.V) v = true;
                     break;
 
                 case EventType.KeyUp:
                     if (onKeyUp != null) onKeyUp(e.keyCode);
-                    if (e.keyCode == KeyCode.V) v = false;
                     break;
             }
             if (onCommand != null && e.commandName != "") onCommand(e.commandName);

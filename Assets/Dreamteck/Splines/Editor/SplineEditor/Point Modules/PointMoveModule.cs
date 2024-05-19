@@ -13,8 +13,6 @@ namespace Dreamteck.Splines.Editor
         public float surfaceOffset = 0f;
         public LayerMask surfaceLayerMask = ~0;
 
-        private bool useTangentHandles => editor.mainModule.tangentMode || editor.selectedPoints.Count != 1;
-
         public PointMoveModule(SplineEditor editor) : base(editor)
         {
 
@@ -56,7 +54,7 @@ namespace Dreamteck.Splines.Editor
             if (Event.current.type == EventType.MouseUp) GetRotation();
         }
 
-        protected override void OnDrawInspector()
+        public override void DrawInspector()
         {
             editSpace = (EditSpace)EditorGUILayout.EnumPopup("Edit Space", editSpace);
             surfaceMode = EditorGUILayout.Toggle("Move On Surface", surfaceMode);
@@ -73,80 +71,49 @@ namespace Dreamteck.Splines.Editor
             }
         }
 
-        private Vector3 SurfaceMoveHandle(Vector3 inputPosition, float size = 0.2f)
-        {
-            Vector3 lastPosition = inputPosition;
-            inputPosition = SplineEditorHandles.FreeMoveHandle(inputPosition, HandleUtility.GetHandleSize(inputPosition) * size, Vector3.zero, Handles.CircleHandleCap);
-            if (lastPosition != inputPosition)
-            {
-                Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
-                RaycastHit hit;
-                if (Physics.Raycast(ray, out hit, Mathf.Infinity, surfaceLayerMask))
-                {
-                    inputPosition = hit.point + hit.normal * surfaceOffset;
-                    Handles.DrawLine(hit.point, hit.point + hit.normal * HandleUtility.GetHandleSize(hit.point) * 0.5f);
-                }
-            }
-            return inputPosition;
-        }
-
-        protected override void OnDrawScene()
+        public override void DrawScene()
         {
             if (selectedPoints.Count == 0) return;
             Vector3 c = selectionCenter;
             Vector3 lastPos = c;
             if (surfaceMode)
             {
-                c = SurfaceMoveHandle(c, 0.2f);
-            }
-            else
-            {
-                c = Handles.PositionHandle(c, rotation);
-            }
+                c = Handles.FreeMoveHandle(c, Quaternion.LookRotation(SceneView.currentDrawingSceneView.camera.transform.position - c), HandleUtility.GetHandleSize(c) * 0.2f, Vector3.zero, Handles.CircleHandleCap);
+                if(lastPos != c)
+                {
+                    Ray ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+                    RaycastHit hit;
+                    if (Physics.Raycast(ray, out hit, Mathf.Infinity, surfaceLayerMask))
+                    {
+                        c = hit.point + hit.normal * surfaceOffset;
+                        Handles.DrawLine(hit.point, hit.point + hit.normal * HandleUtility.GetHandleSize(hit.point) * 0.5f);
+                    }
+                }
+            } else c = Handles.PositionHandle(c, rotation);
             if (lastPos != c)
             {
-                RegisterChange();
+                RecordUndo("Move Points");
                 for (int i = 0; i < selectedPoints.Count; i++)
                 {
+                    if (isClosed && selectedPoints[i] == points.Length - 1) continue;
                     points[selectedPoints[i]].SetPosition(points[selectedPoints[i]].position + (c - lastPos));
                     if (snap) points[selectedPoints[i]].SetPosition(SnapPoint(points[selectedPoints[i]].position));
                 }
             }
 
-            if (splineType == Spline.Type.Bezier && selectedPoints.Count == 1 && useTangentHandles)
+            if (splineType == Spline.Type.Bezier && selectedPoints.Count == 1)
             {
                 int index = selectedPoints[0];
                 lastPos = points[index].tangent;
-                Vector3 newPos = Vector3.zero;
-                if (surfaceMode)
-                {
-                    newPos = SurfaceMoveHandle(points[index].tangent, 0.15f);
-                } else
-                {
-                    newPos = Handles.PositionHandle(points[index].tangent, rotation);
-                }
-
+                Vector3 newPos = Handles.PositionHandle(points[index].tangent, rotation);
                 if (snap) newPos = SnapPoint(newPos);
-                if (newPos != lastPos)
-                {
-                    RegisterChange();
-                }
+                if (newPos != lastPos) RecordUndo("Move Tangents");
                 points[index].SetTangentPosition(newPos);
 
                 lastPos = points[index].tangent2;
-                if (surfaceMode)
-                {
-                    newPos = SurfaceMoveHandle(points[index].tangent2, 0.15f);
-                } else
-                {
-                    newPos = Handles.PositionHandle(points[index].tangent2, rotation);
-                }
-                    
+                newPos = Handles.PositionHandle(points[index].tangent2, rotation);
                 if (snap) newPos = SnapPoint(newPos);
-                if (newPos != lastPos)
-                {
-                    RegisterChange();
-                }
+                if (newPos != lastPos) RecordUndo("Move Tangents");
                 points[index].SetTangent2Position(newPos);
             }
         }

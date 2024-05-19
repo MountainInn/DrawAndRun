@@ -1,4 +1,4 @@
-namespace Dreamteck.Splines
+﻿namespace Dreamteck.Splines
 {
     using System.Collections;
     using System.Collections.Generic;
@@ -13,33 +13,22 @@ namespace Dreamteck.Splines
         public delegate void EmptyHandler();
         public static int threadCount
         {
-            get {
-#if UNITY_WSA
-                return 0;
-#else
-                return threads.Length;
-#endif
-            }
+            get { return threads.Length; }
             set
             {
-#if !UNITY_WSA
                 if(value > threads.Length)
                 {
                     while (threads.Length < value)
                     {
                         ThreadDef thread = new ThreadDef();
 #if UNITY_EDITOR
-                        if (Application.isPlaying)
-                        {
-                            thread.Restart();
-                        }
+                        if(Application.isPlaying) thread.Restart();
 #else
                         thread.Restart();
 #endif
                         ArrayUtility.Add(ref threads, thread);
                     }
                 }
-#endif
             }
         }
 #if !UNITY_WSA
@@ -85,26 +74,21 @@ namespace Dreamteck.Splines
             {
                 thread = new Thread(start);
                 thread.Start(worker);
+                Debug.Log("Starting Thread");
             }
 
             internal void Abort()
             {
-                if (isAlive)
-                {
-                    thread.Abort();
-                }
+                if (isAlive) thread.Abort();
+                Debug.Log("Stopping Thread");
             }
         }
         internal static ThreadDef[] threads = new ThreadDef[2];
         internal static readonly object locker = new object();
         static SplineThreading()
         {
-            Application.quitting += Quitting;
-            for (int i = 0; i < threads.Length; i++)
-            {
-                threads[i] = new ThreadDef();
-            }
-
+            //Application.quitting += Quitting; Does not work in Unity 2017
+            for (int i = 0; i < threads.Length; i++) threads[i] = new ThreadDef();
 #if UNITY_EDITOR
             PrewarmThreads();
             UnityEditor.EditorApplication.playModeStateChanged += OnPlayStateChanged;
@@ -114,10 +98,7 @@ namespace Dreamteck.Splines
 #if UNITY_EDITOR
         static void OnPlayStateChanged(UnityEditor.PlayModeStateChange state)
         {
-            if (state == UnityEditor.PlayModeStateChange.ExitingPlayMode)
-            {
-                Quitting();
-            }
+            if (state == UnityEditor.PlayModeStateChange.ExitingPlayMode) Quitting();
         }
 #endif
 
@@ -150,7 +131,7 @@ namespace Dreamteck.Splines
                 }
                 catch (System.Exception ex)
                 {
-                    if(ex.Message != "") Debug.LogError("THREAD EXCEPTION " + ex.Message);
+                    if(ex.Message != "") Debug.Log("THREAD EXCEPTION " + ex.Message);
                     break;
                 }
             }
@@ -159,7 +140,7 @@ namespace Dreamteck.Splines
         }
 #endif
 
-            public static void Run(EmptyHandler handler)
+        public static void Run(EmptyHandler handler)
         {
 #if !UNITY_WSA
 #if UNITY_EDITOR
@@ -184,24 +165,16 @@ namespace Dreamteck.Splines
 
         public static void PrewarmThreads()
         {
-#if !UNITY_WSA
             for (int i = 0; i < threads.Length; i++)
             {
-                if (!threads[i].isAlive)
-                {
-                    threads[i].Restart();
-                }
+                if (!threads[i].isAlive) threads[i].Restart();
             }
-#endif
         }
 
         public static void Stop()
         {
 #if !UNITY_WSA
-            for (int i = 0; i < threads.Length; i++)
-            {
-                threads[i].Abort();
-            }
+            for (int i = 0; i < threads.Length; i++) threads[i].Abort();
 #endif
         }
     }

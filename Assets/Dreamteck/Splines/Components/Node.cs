@@ -103,13 +103,13 @@ namespace Dreamteck.Splines
         [HideInInspector]
         private bool _transformTangents = true;
 
-        private Vector3 _lastPosition, _lastScale;
-        private Quaternion _lastRotation;
-        private Transform _trs;
+        private Vector3 lastPosition, lastScale;
+        private Quaternion lastRotation;
+        Transform trs;
 
         private void Awake()
         {
-            _trs = transform;
+            trs = transform;
             SampleTransform();
         }
 
@@ -127,30 +127,21 @@ namespace Dreamteck.Splines
         bool TransformChanged()
         {
 #if UNITY_EDITOR
-            if(_trs == null) return _lastPosition != transform.position || _lastRotation != transform.rotation || _lastScale != transform.lossyScale;
+            if(trs == null) return lastPosition != transform.position || lastRotation != transform.rotation || lastScale != transform.lossyScale;
 #endif
-            return _lastPosition != _trs.position || _lastRotation != _trs.rotation || _lastScale != _trs.lossyScale;
+            return lastPosition != trs.position || lastRotation != trs.rotation || lastScale != trs.lossyScale;
         }
 
         void SampleTransform() {
 #if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                _lastPosition = transform.position;
-                _lastScale = transform.lossyScale;
-                _lastRotation = transform.rotation;
-            } 
-            else
-            {
-                _lastPosition = _trs.position;
-                _lastScale = _trs.lossyScale;
-                _lastRotation = _trs.rotation;
-            }
+            lastPosition = transform.position;
+            lastScale = transform.lossyScale;
+            lastRotation = transform.rotation;
             return;
 #else
-            _lastPosition = _trs.position;
-            _lastScale = _trs.lossyScale;
-            _lastRotation = _trs.rotation;
+            lastPosition = trs.position;
+            lastScale = trs.lossyScale;
+            lastRotation = trs.rotation;
 #endif
         }
 
@@ -158,16 +149,6 @@ namespace Dreamteck.Splines
         {
             if (TransformChanged())
             {
-#if UNITY_EDITOR
-                if (!Application.isPlaying)
-                {
-                    UnityEditor.EditorUtility.SetDirty(this);
-                    for (int i = 0; i < connections.Length; i++)
-                    {
-                        UnityEditor.EditorUtility.SetDirty(connections[i].spline);
-                    }
-                }
-#endif
                 UpdateConnectedComputers();
                 SampleTransform();
             }
@@ -245,27 +226,16 @@ namespace Dreamteck.Splines
                     RemoveConnection(i);
                     continue;
                 }
-
                 if (connections[i].spline == excludeComputer) continue;
-
-                if (type == Type.Smooth && i != 0)
-                {
-                    SetPoint(i, GetPoint(0, false), false);
-                }
+                if (type == Type.Smooth && i != 0) SetPoint(i, GetPoint(0, false), false);
                 SplinePoint point = GetPoint(i, true);
-                if (!transformNormals)
-                {
-                    point.normal = connections[i].spline.GetPointNormal(connections[i].pointIndex);
-                }
+                if (!transformNormals) point.normal = connections[i].spline.GetPointNormal(connections[i].pointIndex);
                 if (!transformTangents)
                 {
                     point.tangent = connections[i].spline.GetPointTangent(connections[i].pointIndex);
                     point.tangent2 = connections[i].spline.GetPointTangent2(connections[i].pointIndex);
                 }
-                if (!transformSize)
-                {
-                    point.size = connections[i].spline.GetPointSize(connections[i].pointIndex);
-                }
+                if(!transformSize) point.size = connections[i].spline.GetPointSize(connections[i].pointIndex);
                 connections[i].spline.SetPoint(connections[i].pointIndex, point);
             }
         }
@@ -273,27 +243,18 @@ namespace Dreamteck.Splines
         public void UpdatePoint(SplineComputer computer, int pointIndex, SplinePoint point, bool updatePosition = true)
         {
 #if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                transform.position = point.position;
-            }
-            else
-            {
-                _trs.position = point.position;
-            }
+            if (!Application.isPlaying) transform.position = point.position;
+            else trs.position = point.position;
 #else
-            _trs.position = point.position;
+            trs.position = point.position;
 #endif
             for (int i = 0; i < connections.Length; i++)
             {
-                if (connections[i].spline == computer && connections[i].pointIndex == pointIndex)
-                {
-                    SetPoint(i, point, true);
-                }
+                if (connections[i].spline == computer && connections[i].pointIndex == pointIndex) SetPoint(i, point, true);
             }
         }
 
-        public void UpdatePoints()
+        private void UpdatePoints()
         {
             for (int i = connections.Length - 1; i >= 0; i--)
             {
@@ -378,7 +339,7 @@ namespace Dreamteck.Splines
         private void RemoveConnection(int index)
         {
             Connection[] newConnections = new Connection[connections.Length - 1];
-            SplineComputer spline = connections[index].spline;
+            SplineComputer computer = connections[index].spline;
             int pointIndex = connections[index].pointIndex;
             for (int i = 0; i < connections.Length; i++)
             {

@@ -9,15 +9,6 @@
     {
         protected string prefPrefix = "";
 
-        private bool _changed = false;
-
-        public bool hasChanged { get { return _changed; } }
-
-        protected void RegisterChange()
-        {
-            _changed = true;
-        }
-
         public virtual void Select()
         {
             LoadState();
@@ -32,23 +23,16 @@
         {
         }
 
-        public void DrawScene()
+        public virtual void DrawScene()
         {
-            _changed = false;
-            OnDrawScene();
+
         }
 
-        protected virtual void OnDrawScene()
+        public virtual void OnSceneDraw()
         {
         }
 
-        public void DrawInspector()
-        {
-            _changed = false;
-            OnDrawInspector();
-        }
-
-        protected virtual void OnDrawInspector()
+        public virtual void DrawInspector()
         {
         }
 
@@ -131,11 +115,9 @@
         internal static GUIContent IconContent(string title, string iconName, string description)
         {
             GUIContent content = new GUIContent(title, description);
-            if (EditorGUIUtility.isProSkin)
-            {
-                iconName += "_dark";
-            }
-            Texture2D tex = ResourceUtility.EditorLoadTexture("Splines/Editor/Icons", iconName);
+            string path = "Splines/Editor/Icons";
+            if (EditorGUIUtility.isProSkin) iconName += "_dark";
+            Texture2D tex = ImageDB.GetImage(iconName + ".png", path);
             if (tex != null)
             {
                 content.image = tex;

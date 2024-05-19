@@ -3,6 +3,10 @@ namespace Dreamteck
     using UnityEditor;
     using UnityEngine;
     using System.Collections.Generic;
+#if !UNITY_2018_3_OR_NEWER
+    using System.Reflection;
+    using Type = System.Type;
+#endif
 
     public static class DreamteckEditorGUI
     {
@@ -42,6 +46,10 @@ namespace Dreamteck
         public static readonly GUIStyle labelText = null;
         private static float scale = -1f;
 
+#if !UNITY_2018_3_OR_NEWER
+        private static MethodInfo gradientFieldMethod;
+#endif
+
         static DreamteckEditorGUI()
         {
             baseColor = EditorGUIUtility.isProSkin ? new Color32(56, 56, 56, 255) : new Color32(194, 194, 194, 255);
@@ -58,7 +66,12 @@ namespace Dreamteck
             labelText.alignment = TextAnchor.MiddleRight;
             labelText.normal.textColor = Color.white;
             SetScale(1f);
-        }
+
+#if !UNITY_2018_3_OR_NEWER
+            Type tyEditorGUILayout = typeof(EditorGUILayout);
+            gradientFieldMethod = tyEditorGUILayout.GetMethod("GradientField", BindingFlags.NonPublic | BindingFlags.Static, null, new Type[] { typeof(string), typeof(Gradient), typeof(GUILayoutOption[]) }, null);
+#endif
+            }
 
         public static void SetScale(float newScale)
         {
@@ -115,7 +128,7 @@ namespace Dreamteck
             return layerMask;
         }
 
-        public static bool DropArea<T>(Rect rect, out T[] content, bool acceptProjectAssets = false)
+        public static bool DropArea<T>(Rect rect, out T[] content)
         {
             content = new T[0];
             switch (Event.current.type)
@@ -135,7 +148,13 @@ namespace Dreamteck
                             if (dragged_object is GameObject)
                             {
                                 GameObject gameObject = (GameObject)dragged_object;
-                                if (acceptProjectAssets || !AssetDatabase.Contains(gameObject))
+#if UNITY_2018_3_OR_NEWER
+                                bool isNotAprefab = PrefabUtility.GetPrefabAssetType(gameObject) == PrefabAssetType.NotAPrefab;
+#else
+                                bool isNotAprefab = PrefabUtility.GetPrefabType(gameObject) == PrefabType.None;
+#endif
+
+                                if (isNotAprefab)
                                 {
                                     if (gameObject.GetComponent<T>() != null) contentList.Add(gameObject.GetComponent<T>());
                                 }
@@ -152,7 +171,12 @@ namespace Dreamteck
 
         public static Gradient GradientField(string label, Gradient gradient, params GUILayoutOption[] options)
         {
+#if UNITY_2018_3_OR_NEWER
             return EditorGUILayout.GradientField(label, gradient, options);
+#else
+             gradient = (Gradient)gradientFieldMethod.Invoke(null, new object[] { label, gradient, options });
+            return gradient;
+#endif
         }
 
         public static void DrawSeparator()

@@ -1,13 +1,18 @@
 using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine.Serialization;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace Dreamteck.Splines {
     [ExecuteInEditMode]
-    public class SplineUser : MonoBehaviour, ISerializationCallbackReceiver
-    {
+    public class SplineUser : MonoBehaviour {
         public enum UpdateMethod { Update, FixedUpdate, LateUpdate }
         [HideInInspector]
         public UpdateMethod updateMethod = UpdateMethod.Update;
-
+       
         public SplineComputer spline
         {
             get {
@@ -32,21 +37,22 @@ namespace Dreamteck.Splines {
             }
         }
 
+       
         public double clipFrom
         {
             get
             {
-                return _clipFrom;
+                return sampleCollection.clipFrom;
             }
             set
             {
-                if (value != _clipFrom)
+                if (value != sampleCollection.clipFrom)
                 {
-                    animClipFrom = (float)_clipFrom;
-                    _clipFrom = DMath.Clamp01(value);
-                    if (_clipFrom > _clipTo)
+                    animClipFrom = (float)sampleCollection.clipFrom;
+                    sampleCollection.clipFrom = DMath.Clamp01(value);
+                    if (sampleCollection.clipFrom > sampleCollection.clipTo)
                     {
-                        if (!_spline.isClosed) _clipTo = _clipFrom;
+                        if (!_spline.isClosed) sampleCollection.clipTo = sampleCollection.clipFrom;
                     }
                     getSamples = true;
                     Rebuild();
@@ -58,18 +64,18 @@ namespace Dreamteck.Splines {
         {
             get
             {
-                return _clipTo;
+                return sampleCollection.clipTo;
             }
             set
             {
 
-                if (value != _clipTo)
+                if (value != sampleCollection.clipTo)
                 {
-                    animClipTo = (float)_clipTo;
-                    _clipTo = DMath.Clamp01(value);
-                    if (_clipTo < _clipFrom)
+                    animClipTo = (float)sampleCollection.clipTo;
+                    sampleCollection.clipTo = DMath.Clamp01(value);
+                    if (sampleCollection.clipTo < sampleCollection.clipFrom)
                     {
-                        if (!_spline.isClosed) _clipFrom = _clipTo;
+                        if (!_spline.isClosed) sampleCollection.clipFrom = sampleCollection.clipTo;
                     }
                     getSamples = true;
                     Rebuild();
@@ -97,18 +103,18 @@ namespace Dreamteck.Splines {
         {
             get
             {
-                return _loopSamples;
+                return sampleCollection.loopSamples;
             }
             set
             {
-                if (value != _loopSamples)
+                if (value != sampleCollection.loopSamples)
                 {
-                    _loopSamples = value;
-                    if(!_loopSamples && _clipTo < _clipFrom)
+                    sampleCollection.loopSamples = value;
+                    if(!sampleCollection.loopSamples && sampleCollection.clipTo < sampleCollection.clipFrom)
                     {
-                        double temp = _clipTo;
-                        _clipTo = _clipFrom;
-                        _clipFrom = temp;
+                        double temp = sampleCollection.clipTo;
+                        sampleCollection.clipTo = sampleCollection.clipFrom;
+                        sampleCollection.clipFrom = temp;
                     }
                     Rebuild();
                 }
@@ -120,8 +126,8 @@ namespace Dreamteck.Splines {
         {
             get
             {
-                if (samplesAreLooped) return (1.0 - _clipFrom) + _clipTo;
-                return _clipTo - _clipFrom;
+                if (samplesAreLooped) return (1.0 - sampleCollection.clipFrom) + sampleCollection.clipTo; 
+                return sampleCollection.clipTo - sampleCollection.clipFrom;
             }
         }
 
@@ -129,7 +135,7 @@ namespace Dreamteck.Splines {
         {
             get
             {
-                return _loopSamples && _clipFrom >= _clipTo;
+                return sampleCollection.samplesAreLooped;
             }
         }
 
@@ -168,6 +174,7 @@ namespace Dreamteck.Splines {
         //Serialized values
         [SerializeField]
         [HideInInspector]
+        [FormerlySerializedAs("_computer")]
         private SplineComputer _spline;
         [SerializeField]
         [HideInInspector]
@@ -184,19 +191,14 @@ namespace Dreamteck.Splines {
         [SerializeField]
         [HideInInspector]
         protected SizeModifier _sizeModifier = new SizeModifier();
-        [SerializeField]
-        [HideInInspector]
-        private SplineSample _clipFromSample = new SplineSample(), _clipToSample = new SplineSample();
 
         [SerializeField]
         [HideInInspector]
-        private bool _loopSamples = false;
+        private SampleCollection sampleCollection = new SampleCollection();
+
         [SerializeField]
         [HideInInspector]
-        private double _clipFrom = 0.0;
-        [SerializeField]
-        [HideInInspector]
-        private double _clipTo = 1.0;
+        private SplineSample clipFromSample = new SplineSample(), clipToSample = new SplineSample();
 
         //float values used for making animations
         [SerializeField]
@@ -205,31 +207,15 @@ namespace Dreamteck.Splines {
         [SerializeField]
         [HideInInspector]
         private float animClipTo = 1f;
-
-        private SampleCollection _sampleCollection = new SampleCollection();
         private bool rebuild = false, getSamples = false, postBuild = false;
-        private Transform _trs = null;
-        private bool _hasTransform = false;
-        private SplineSample _workSample = new SplineSample();
-#if UNITY_EDITOR
-        private bool _isPlaying = false;
-        protected bool isPlaying => _isPlaying;
-#endif
-
-        protected Transform trs
-        {
-            get {  return _trs;  }
-        }
-        protected bool hasTransform
-        {
-            get { return _hasTransform; }
-        }
+        protected Transform trs = null;
         public int sampleCount
         {
             get { return _sampleCount; }
         }
-
-        private int _sampleCount = 0, _startSampleIndex = 0;
+        [SerializeField]
+        [HideInInspector]
+        private int _sampleCount = 0, startSampleIndex = 0;
         /// <summary>
         /// Use this to work with the Evaluate and Project methods
         /// </summary>
@@ -239,100 +225,62 @@ namespace Dreamteck.Splines {
         [HideInInspector]
         public volatile bool multithreaded = false;
         [HideInInspector]
-        public bool buildOnAwake = true;
+        public bool buildOnAwake = false;
         [HideInInspector]
         public bool buildOnEnable = false;
 
-        public event EmptySplineHandler onPostBuild;
 
 #if UNITY_EDITOR
+        /// <summary>
+        /// Used by the custom editor. DO NO CALL THIS METHOD IN YOUR RUNTIME CODE
+        /// </summary>
         public virtual void EditorAwake()
         {
-
+            Awake();
+            RebuildImmediate();
+            GetSamples();
         }
 #endif
 
         protected virtual void Awake() {
-#if UNITY_EDITOR
-            _isPlaying = Application.isPlaying;
-            if (!_isPlaying)
-            {
-                if (spline != null)
-                {
-                    if (!_spline.IsSubscribed(this))
-                    {
-                        _spline.Subscribe(this);
-                        UnityEditor.EditorUtility.SetDirty(spline);
-                    }
-                }
-            }
-#endif
-
-            CacheTransform();
-            if (buildOnAwake && Application.isPlaying)
-            {
-                RebuildImmediate();
-            } else
-            {
-                GetSamples();
-            }
-
-#if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                RebuildImmediate();
-            }
-#endif
-        }
-
-        protected void CacheTransform()
-        {
-            _trs = transform;
-            _hasTransform = true;
+            trs = transform;
+            if (spline == null) spline = GetComponent<SplineComputer>();
+            else if (!spline.IsSubscribed(this)) spline.Subscribe(this);
+            if (buildOnAwake) RebuildImmediate();
         }
 
         protected virtual void Reset()
         {
 #if UNITY_EDITOR
-            spline = GetComponent<SplineComputer>();
-            Awake();
+            EditorAwake();
 #endif
         }
 
+
         protected virtual void OnEnable()
         {
-#if UNITY_EDITOR
-            if (!_isPlaying || buildOnEnable)
-            {
-                RebuildImmediate();
-            }
-#else
-            if (buildOnEnable){
-                RebuildImmediate();
-            }
-#endif
+            if (spline != null) spline.Subscribe(this);
+            if (buildOnEnable) RebuildImmediate();
         }
 
         protected virtual void OnDisable()
         {
+            if (spline != null) spline.Unsubscribe(this);
         }
 
         protected virtual void OnDestroy()
         {
 #if UNITY_EDITOR
-            if (!_isPlaying && spline != null)
-            {
-                _spline.Unsubscribe(this); //Unsubscribe if DestroyImmediate is called
-            }
+            if (!Application.isPlaying && spline != null) spline.Unsubscribe(this); //Unsubscribe if DestroyImmediate is called
 #endif
         }
 
         protected virtual void OnDidApplyAnimationProperties()
         {
             bool clip = false;
-            if (_clipFrom != animClipFrom || _clipTo != animClipTo) clip = true;
-            _clipFrom = animClipFrom;
-            _clipTo = animClipTo;
+            if (sampleCollection.clipFrom != animClipFrom || sampleCollection.clipTo != animClipTo) clip = true;
+            sampleCollection.clipFrom = animClipFrom;
+            sampleCollection.clipTo = animClipTo;
             Rebuild();
             if (clip) GetSamples();
         }
@@ -342,61 +290,29 @@ namespace Dreamteck.Splines {
         /// </summary>
         /// <param name="index">Sample index</param>
         /// <returns></returns>
-        public void GetSampleRaw(int index, ref SplineSample sample)
+        public SplineSample GetSampleRaw(int index)
         {
-            if (index == 0)
+            if (index >= _sampleCount) index = _sampleCount - 1;
+            if (sampleCollection.samplesAreLooped)
             {
-                sample.FastCopy(ref _clipFromSample);
-                return;
-            }
-            if (index == _sampleCount - 1)
-            {
-                sample.FastCopy(ref _clipToSample);
-                return;
-            }
-
-            ClampLoopSampleIndex(ref index);
-            sample.FastCopy(ref _sampleCollection.samples[index]);
-        }
-
-        public double GetSamplePercent(int index)
-        {
-            if (index == 0)
-            {
-                return _clipFromSample.percent;
-            }
-            if (index == _sampleCount - 1)
-            {
-                return _clipToSample.percent;
-            }
-
-            ClampLoopSampleIndex(ref index);
-            return _sampleCollection.samples[index].percent;
-        }
-
-        private void ClampLoopSampleIndex(ref int index)
-        {
-            if (index >= _sampleCount)
-            {
-                index = _sampleCount - 1;
-            }
-
-            if (samplesAreLooped)
-            {
-                int start;
+                int start, end;
                 double lerp;
-                _sampleCollection.GetSamplingValues(clipFrom, out start, out lerp);
+                sampleCollection.GetSamplingValues(clipFrom, out start, out lerp);
+                sampleCollection.GetSamplingValues(clipTo, out end, out lerp);
+                if (index == 0) return clipFromSample;
+                int endSample = end;
+                if (lerp > 0.0) endSample++;
+                if (index == _sampleCount - 1) return clipToSample;
+                int loopedIndex = start + index;
+                if (loopedIndex >= sampleCollection.Count) loopedIndex -= sampleCollection.Count;
+                return sampleCollection.samples[loopedIndex];
+            }
 
-                index = start + index;
-                if (index >= _sampleCollection.length)
-                {
-                    index -= _sampleCollection.length;
-                }
-            }
-            else
-            {
-                index = _startSampleIndex + index;
-            }
+
+
+            if (index == 0) return clipFromSample;
+            if (index == _sampleCount - 1) return clipToSample;
+            return sampleCollection.samples[startSampleIndex + index];
         }
 
 
@@ -405,30 +321,9 @@ namespace Dreamteck.Splines {
         /// </summary>
         /// <param name="index">Sample index</param>
         /// <param name="target">Sample to write to</param>
-        public void GetSample(int index, ref SplineSample target)
+        public void GetSample(int index, SplineSample target)
         {
-            GetSampleRaw(index, ref _workSample);
-            ModifySample(ref _workSample, ref target);
-        }
-
-        /// <summary>
-        /// Returns the sample at the given index with modifiers applied and
-        /// applies compensation to the size parameter based on the angle between the samples
-        /// </summary>
-        public void GetSampleWithAngleCompensation(int index, ref SplineSample target)
-        {
-            GetSampleRaw(index, ref target);
-            ModifySample(ref target, ref target);
-            if(index > 0 && index < sampleCount - 1)
-            {
-                GetSampleRaw(index - 1, ref _workSample);
-                ModifySample(ref _workSample, ref _workSample);
-                Vector3 prev = target.position - _workSample.position;
-                GetSampleRaw(index + 1, ref _workSample);
-                ModifySample(ref _workSample, ref _workSample);
-                Vector3 next = _workSample.position - target.position;
-                target.size *= 1 / Mathf.Sqrt(Vector3.Dot(prev.normalized, next.normalized) * 0.5f + 0.5f);
-            }
+            ModifySample(GetSampleRaw(index), target);
         }
 
 
@@ -439,21 +334,13 @@ namespace Dreamteck.Splines {
         public virtual void Rebuild()
         {
 #if UNITY_EDITOR
-            if (!_hasTransform)
-            {
-                CacheTransform();
-            }
-
+            if (trs == null) trs = transform;
             //If it's the editor and it's not playing, then rebuild immediate
-            if (_isPlaying)
+            if (Application.isPlaying)
             {
                 if (!autoUpdate) return;
                 rebuild = getSamples = true;
-            }
-            else
-            {
-                RebuildImmediate();
-            }
+            } else RebuildImmediate();
 #else
              if (!autoUpdate) return;
              rebuild = getSamples = true;
@@ -467,20 +354,19 @@ namespace Dreamteck.Splines {
         public virtual void RebuildImmediate()
         {
 #if UNITY_EDITOR
-            if (!_hasTransform)
-            {
-                CacheTransform();
-            }
+            if (trs == null) trs = transform;
+#if !UNITY_2018_3_OR_NEWER
+            if (PrefabUtility.GetPrefabType(gameObject) == PrefabType.Prefab) return;
+#endif
 #endif
             try
             {
                 GetSamples();
                 Build();
                 PostBuild();
-            }
-            catch (System.Exception ex)
+            } catch (System.Exception ex)
             {
-                Debug.LogError(ex.Message);
+                Debug.Log(ex.Message);
             }
             rebuild = false;
             getSamples = false;
@@ -497,7 +383,7 @@ namespace Dreamteck.Splines {
         }
 
         private void LateUpdate()
-        {
+        {   
             if (updateMethod == UpdateMethod.LateUpdate)
             {
                 Run();
@@ -505,7 +391,7 @@ namespace Dreamteck.Splines {
                 LateRun();
             }
 #if UNITY_EDITOR
-            if(!_isPlaying && updateMethod == UpdateMethod.FixedUpdate)
+            if(!Application.isPlaying && updateMethod == UpdateMethod.FixedUpdate)
             {
                 Run();
                 RunUpdate();
@@ -521,14 +407,14 @@ namespace Dreamteck.Splines {
                 Run();
                 RunUpdate();
                 LateRun();
-            }
+            } 
         }
 
         //Update logic for handling threads and rebuilding
         private void RunUpdate()
         {
 #if UNITY_EDITOR
-            if (!_isPlaying) return;
+            if (!Application.isPlaying) return;
 #endif
             //Handle rebuilding
             if (rebuild)
@@ -540,7 +426,7 @@ namespace Dreamteck.Splines {
                 }
                 else
                 {
-                    if (getSamples || _spline.sampleMode == SplineComputer.SampleMode.Optimized) GetSamples();
+                    if (getSamples || spline.sampleMode == SplineComputer.SampleMode.Optimized) GetSamples();
                     Build();
                     postBuild = true;
                 }
@@ -549,31 +435,18 @@ namespace Dreamteck.Splines {
             if (postBuild)
             {
                 PostBuild();
-                EmptySplineHandler postBuildHandler = onPostBuild;
-                if(postBuildHandler != null)
-                {
-                    postBuildHandler();
-                }
                 postBuild = false;
             }
         }
 
         void BuildThreaded()
         {
-            while (postBuild)
-            {
-                //Wait if the main thread is still running post build operations
-            }
             Build();
             postBuild = true;
         }
 
-        private void ResampleAndBuildThreaded()
+        void ResampleAndBuildThreaded()
         {
-            while (postBuild)
-            {
-                //Wait if the main thread is still running post build operations
-            }
             GetSamples();
             Build();
             postBuild = true;
@@ -611,35 +484,22 @@ namespace Dreamteck.Splines {
         /// </summary>
         /// <param name="source">Original sample</param>
         /// <param name="destination">Destination sample</param>
-        public void ModifySample(ref SplineSample source, ref SplineSample destination)
+        public void ModifySample(SplineSample source, SplineSample destination)
         {
-            destination = source;
-            ModifySample(ref destination);
+            destination.CopyFrom(source);
+            ModifySample(destination);
         }
 
         /// <summary>
         /// Applies the SplineUser modifiers to the provided sample
         /// </summary>
         /// <param name="sample"></param>
-        public void ModifySample(ref SplineSample sample)
+        public void ModifySample(SplineSample sample)
         {
-            ApplyModifier(_offsetModifier, ref sample);
-            ApplyModifier(_rotationModifier, ref sample);
-            ApplyModifier(_colorModifier, ref sample);
-            ApplyModifier(_sizeModifier, ref sample);
-        }
-
-        private void ApplyModifier(SplineSampleModifier modifier, ref SplineSample sample)
-        {
-            if (modifier.useClippedPercent)
-            {
-                ClipPercent(ref sample.percent);
-            }
-            modifier.Apply(ref sample);
-            if (modifier.useClippedPercent)
-            {
-                UnclipPercent(ref sample.percent);
-            }
+            offsetModifier.Apply(sample);
+            _rotationModifier.Apply(sample);
+            _colorModifier.Apply(sample);
+            _sizeModifier.Apply(sample);
         }
 
         /// <summary>
@@ -650,8 +510,8 @@ namespace Dreamteck.Splines {
         public void SetClipRange(double from, double to)
         {
             if (!_spline.isClosed && to < from) to = from;
-            _clipFrom = DMath.Clamp01(from);
-            _clipTo = DMath.Clamp01(to);
+            sampleCollection.clipFrom = DMath.Clamp01(from);
+            sampleCollection.clipTo = DMath.Clamp01(to);
             GetSamples();
             Rebuild();
         }
@@ -661,42 +521,15 @@ namespace Dreamteck.Splines {
         /// </summary>
         private void GetSamples()
         {
+            if (spline == null) return;
             getSamples = false;
-            if (spline == null)
-            {
-                _sampleCollection.samples = new SplineSample[0];
-                _sampleCount = 0;
-                return;
-            }
-
-            _spline.GetSamples(_sampleCollection);
-
-            if (_sampleCollection.length == 0)
-            {
-                _sampleCount = 0;
-                return;
-            }
-
-            if (_clipFrom != 0.0)
-            {
-                _sampleCollection.Evaluate(clipFrom, ref _clipFromSample);
-            } else
-            {
-                _clipFromSample = _sampleCollection.samples[0];
-            }
-
-            if(_clipTo != 1.0)
-            {
-                _sampleCollection.Evaluate(_clipTo, ref _clipToSample);
-            } else
-            {
-                _clipToSample = _sampleCollection.samples[_sampleCollection.length - 1];
-            }
-
+            spline.GetSamples(sampleCollection);
+            sampleCollection.Evaluate(0.0, clipFromSample);
+            sampleCollection.Evaluate(1.0, clipToSample);
             int start, end;
-            _sampleCount = _sampleCollection.GetClippedSampleCount(_clipFrom, _clipTo, out start, out end);
+            _sampleCount = sampleCollection.GetClippedSampleCount(out start, out end);
             double lerp;
-            _sampleCollection.GetSamplingValues(_clipFrom, out _startSampleIndex, out lerp);
+            sampleCollection.GetSamplingValues(sampleCollection.clipFrom, out startSampleIndex, out lerp);
         }
 
         /// <summary>
@@ -717,24 +550,7 @@ namespace Dreamteck.Splines {
         /// <returns></returns>
         public void ClipPercent(ref double percent)
         {
-            if (_sampleCollection.length == 0)
-            {
-                percent = 0.0;
-                return;
-            }
-
-            if (samplesAreLooped)
-            {
-                if (percent >= clipFrom && percent <= 1.0) { percent = DMath.InverseLerp(clipFrom, clipFrom + span, percent); }//If in the range clipFrom - 1.0
-                else if (percent <= clipTo) { percent = DMath.InverseLerp(clipTo - span, clipTo, percent); } //if in the range 0.0 - clipTo
-                else
-                {
-                    //Find the nearest clip start
-                    if (DMath.InverseLerp(clipTo, clipFrom, percent) < 0.5) percent = 1.0;
-                    else percent = 0.0;
-                }
-            }
-            else percent = DMath.InverseLerp(clipFrom, clipTo, percent);
+            sampleCollection.ClipPercent(ref percent);
         }
 
         public double UnclipPercent(double percent)
@@ -743,108 +559,55 @@ namespace Dreamteck.Splines {
             return percent;
         }
 
+        //Converts a clipped [0-1] percent into a spline percent
         public void UnclipPercent(ref double percent)
         {
-            if (samplesAreLooped)
-            {
-                if (span <= 0.00001)
-                {
-                    percent = clipFrom;
-                    return;
-                }
-                double fromRatio = (1.0 - clipFrom) / span;
-                if (percent < fromRatio)
-                {
-                    percent = DMath.Lerp(clipFrom, 1.0, percent / fromRatio);
-                }
-                else if (clipTo == 0.0)
-                {
-                    percent = 0.0;
-                    return;
-                }
-                else percent = DMath.Lerp(0.0, clipTo, (percent - fromRatio) / (clipTo / span));
-            }
-            else
-            {
-                if (percent == 0.0)
-                {
-                    percent = clipFrom;
-                    return;
-                }
-                else if (percent == 1.0)
-                {
-                    percent = clipTo;
-                    return;
-                }
-
-                percent = DMath.Lerp(clipFrom, clipTo, percent);
-            }
-            percent = DMath.Clamp01(percent);
+            sampleCollection.UnclipPercent(ref percent);
         }
 
         private int GetSampleIndex(double percent)
         {
-            int index;
-            double lerp;
-            _sampleCollection.GetSamplingValues(UnclipPercent(percent), out index, out lerp);
-            return index;
+            return DMath.FloorInt(percent * (sampleCollection.Count - 1));
         }
 
         public Vector3 EvaluatePosition(double percent)
         {
-            return _sampleCollection.EvaluatePosition(UnclipPercent(percent));
+            return sampleCollection.EvaluatePosition(percent);
         }
 
-        public void Evaluate(double percent, ref SplineSample result)
+        public void Evaluate(double percent, SplineSample result)
         {
-            _sampleCollection.Evaluate(UnclipPercent(percent), ref result);
+            sampleCollection.Evaluate(percent, result);
             result.percent = DMath.Clamp01(percent);
         }
 
         public SplineSample Evaluate(double percent)
         {
             SplineSample result = new SplineSample();
-            Evaluate(percent, ref result);
+            Evaluate(percent, result);
             result.percent = DMath.Clamp01(percent);
             return result;
         }
 
         public void Evaluate(ref SplineSample[] results, double from = 0.0, double to = 1.0)
         {
-            _sampleCollection.Evaluate(ref results, UnclipPercent(from), UnclipPercent(to));
-            for (int i = 0; i < results.Length; i++)
-            {
-                ClipPercent(ref results[i].percent);
-            }
+            sampleCollection.Evaluate(ref results, from, to);
+            for (int i = 0; i < results.Length; i++) ClipPercent(ref results[i].percent);
         }
 
         public void EvaluatePositions(ref Vector3[] positions, double from = 0.0, double to = 1.0)
         {
-            _sampleCollection.EvaluatePositions(ref positions, UnclipPercent(from), UnclipPercent(to));
+            sampleCollection.EvaluatePositions(ref positions, from, to);
         }
 
         public double Travel(double start, float distance, Spline.Direction direction, out float moved)
         {
             moved = 0f;
-            if (direction == Spline.Direction.Forward && start >= 1.0)
-            {
-                return 1.0;
-            }
-            else if (direction == Spline.Direction.Backward && start <= 0.0)
-            {
-                return 0.0;
-            }
-            if (distance == 0f)
-            {
-                return DMath.Clamp01(start);
-            }
-
-            double result = _sampleCollection.Travel(UnclipPercent(start), distance, direction, out moved, clipFrom, clipTo);
-            double clippedResult = ClipPercent(result);
-
-            moved -= (float)(result - clippedResult);
-
-            return clippedResult;
+            if (direction == Spline.Direction.Forward && start >= 1.0) return 1.0;
+            else if (direction == Spline.Direction.Backward && start <= 0.0) return 0.0;
+            if (distance == 0f) return DMath.Clamp01(start);
+            double result = sampleCollection.Travel(start, distance, direction, out moved);
+            return ClipPercent(result);
         }
 
         public double Travel(double start, float distance, Spline.Direction direction = Spline.Direction.Forward)
@@ -853,59 +616,16 @@ namespace Dreamteck.Splines {
             return Travel(start, distance, direction, out moved);
         }
 
-        public double TravelWithOffset(double start, float distance, Spline.Direction direction, Vector3 offset, out float moved)
-        {
-            moved = 0f;
-            if (direction == Spline.Direction.Forward && start >= 1.0)
-            {
-                return 1.0;
-            }
-            else if (direction == Spline.Direction.Backward && start <= 0.0)
-            {
-                return 0.0;
-            }
-            if (distance == 0f)
-            {
-                return DMath.Clamp01(start);
-            }
-            double result = _sampleCollection.TravelWithOffset(UnclipPercent(start), distance, direction, offset, out moved, clipFrom, clipTo);
-            return ClipPercent(result);
-        }
-
-        public virtual void Project(Vector3 position, ref SplineSample result, double from = 0.0, double to = 1.0)
+        public virtual void Project(Vector3 position, SplineSample result, double from = 0.0, double to = 1.0)
         {
             if (_spline == null) return;
-            _sampleCollection.Project(position, _spline.pointCount, ref result, UnclipPercent(from), UnclipPercent(to));
+            sampleCollection.Project(position, _spline.pointCount, result, from, to);
             ClipPercent(ref result.percent);
         }
 
-        public float CalculateLength(double from = 0.0, double to = 1.0, bool preventInvert = true)
+        public float CalculateLength(double from = 0.0, double to = 1.0)
         {
-            return _sampleCollection.CalculateLength(UnclipPercent(from), UnclipPercent(to), preventInvert);
-        }
-
-        public float CalculateLengthWithOffset(Vector3 offset, double from = 0.0, double to = 1.0)
-        {
-            return _sampleCollection.CalculateLengthWithOffset(offset, UnclipPercent(from), UnclipPercent(to));
-        }
-
-        public virtual void OnBeforeSerialize()
-        {
-        }
-
-        public virtual void OnAfterDeserialize()
-        {
-        }
-
-        /// <summary>
-        /// Returns the offset transformed by the sample
-        /// </summary>
-        /// <param name="sample">Source sample</param>
-        /// <param name="localOffset">Local offset to apply</param>
-        /// <returns></returns>
-        protected static Vector3 TransformOffset(SplineSample sample, Vector3 localOffset)
-        {
-            return (sample.right * localOffset.x + sample.up * localOffset.y + sample.forward * localOffset.z) * sample.size;
+            return sampleCollection.CalculateLength(from, to);
         }
     }
 }

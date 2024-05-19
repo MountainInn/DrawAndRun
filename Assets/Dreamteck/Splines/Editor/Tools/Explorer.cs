@@ -60,7 +60,7 @@ namespace Dreamteck.Splines.Editor
             {
                 for (int i = 0; i < selected.Count; i++)
                 {
-                    if (!sceneSplines[selected[i]].editorAlwaysDraw)
+                    if (!sceneSplines[selected[i]].alwaysDraw)
                     {
                         DSSplineDrawer.DrawSplineComputer(sceneSplines[selected[i]]);
                     }
@@ -106,9 +106,9 @@ namespace Dreamteck.Splines.Editor
                 {
                     foreach (int index in selected) sceneSplines[index].editorPathColor = pathColor;
                 }
-                bool alwaysDraw = sceneSplines[i].editorAlwaysDraw;
+                bool alwaysDraw = sceneSplines[i].alwaysDraw;
                 alwaysDraw = EditorGUILayout.Toggle(alwaysDraw, GUILayout.Width(40));
-                if(alwaysDraw != sceneSplines[i].editorAlwaysDraw)
+                if(alwaysDraw != sceneSplines[i].alwaysDraw)
                 {
                     foreach (int index in selected)
                     {
@@ -122,11 +122,11 @@ namespace Dreamteck.Splines.Editor
                         }
                     }
                 }
-                bool thickness = sceneSplines[i].editorDrawThickness;
+                bool thickness = sceneSplines[i].drawThinckness;
                 thickness = EditorGUILayout.Toggle(thickness, GUILayout.Width(40));
-                if(thickness != sceneSplines[i].editorDrawThickness)
+                if(thickness != sceneSplines[i].drawThinckness)
                 {
-                    foreach (int index in selected) sceneSplines[index].editorDrawThickness = thickness;
+                    foreach (int index in selected) sceneSplines[index].drawThinckness = thickness;
                 }
                 EditorGUILayout.EndHorizontal();
                 lastRect = GUILayoutUtility.GetLastRect();

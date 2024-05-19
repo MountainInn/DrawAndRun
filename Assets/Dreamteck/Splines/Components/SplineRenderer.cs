@@ -29,55 +29,55 @@ namespace Dreamteck.Splines
         public bool autoOrient = true;
         [HideInInspector]
         public int updateFrameInterval = 0;
+
+        private int currentFrame = 0;
+
+
         [SerializeField]
         [HideInInspector]
         private int _slices = 1;
+        [SerializeField]
+        [HideInInspector]
+        private Vector3 vertexDirection = Vector3.up;
+        private bool orthographic = false;
+        private bool init = false;
 
-        private int _currentFrame = 0;
-        private Vector3 _vertexDirection = Vector3.up;
-        private bool _orthographic = false;
-        private bool _init = false;
+        protected override void Awake()
+        {
+            base.Awake();
+            mesh.name = "spline";
+        }
 
         void Start()
         {
-            if (Camera.current != null)
-            {
-                _orthographic = Camera.current.orthographic;
-            } 
-            else if (Camera.main != null)
-            {
-                _orthographic = Camera.main.orthographic;
-            }
-
-            CreateMesh();
+            if (Camera.current != null) orthographic = Camera.current.orthographic;
         }
 
         protected override void LateRun()
         {
             if (updateFrameInterval > 0)
             {
-                _currentFrame++;
-                if (_currentFrame > updateFrameInterval) _currentFrame = 0;
+                currentFrame++;
+                if (currentFrame > updateFrameInterval) currentFrame = 0;
             }
         }
 
         protected override void BuildMesh()
         {
             base.BuildMesh();
-            GenerateVertices(_vertexDirection, _orthographic);
-            MeshUtility.GeneratePlaneTriangles(ref _tsMesh.triangles, _slices, sampleCount, false, 0, 0);
+            GenerateVertices(vertexDirection, orthographic);
+            MeshUtility.GeneratePlaneTriangles(ref tsMesh.triangles, _slices, sampleCount, false, 0, 0);
         }
 
         public void RenderWithCamera(Camera cam)
         {
-            _orthographic = cam.orthographic;
-            if (_orthographic)
+            if (sampleCount == 0) return;
+            orthographic = true;
+            if (cam != null)
             {
-                _vertexDirection = -cam.transform.forward;
-            }
-            else
-            {
-                _vertexDirection = cam.transform.position;
+                if (cam.orthographic) vertexDirection = -cam.transform.forward;
+                else vertexDirection = cam.transform.position;
+                orthographic = cam.orthographic;
             }
             BuildMesh();
             WriteMesh();
@@ -88,26 +88,17 @@ namespace Dreamteck.Splines
             if (!autoOrient) return;
             if (updateFrameInterval > 0)
             {
-                if (_currentFrame != 0) return;
+                if (currentFrame != 0) return;
             }
-
             if (!Application.isPlaying)
             {
-                if (!_init)
+                if (!init)
                 {
                     Awake();
-                    _init = true;
+                    init = true;
                 }
             }
-
-            if (Camera.current != null)
-            {
-                RenderWithCamera(Camera.current);
-            } 
-            else if(Camera.main)
-            {
-                RenderWithCamera(Camera.main);
-            }
+            RenderWithCamera(Camera.current);
         }
 
         public void GenerateVertices(Vector3 vertexDirection, bool orthoGraphic)
@@ -118,7 +109,7 @@ namespace Dreamteck.Splines
             bool hasOffset = offset != Vector3.zero;
             for (int i = 0; i < sampleCount; i++)
             {
-                GetSample(i, ref evalResult);
+                GetSample(i, evalResult);
                 Vector3 center = evalResult.position;
                 if (hasOffset) center += offset.x * -Vector3.Cross(evalResult.forward, evalResult.up) + offset.y * evalResult.up + offset.z * evalResult.forward;
                 Vector3 vertexNormal;
@@ -130,11 +121,11 @@ namespace Dreamteck.Splines
                 for (int n = 0; n < _slices + 1; n++)
                 {
                     float slicePercent = ((float)n / _slices);
-                    _tsMesh.vertices[vertexIndex] = center - vertexRight * evalResult.size * 0.5f * size + vertexRight * evalResult.size * slicePercent * size;
+                    tsMesh.vertices[vertexIndex] = center - vertexRight * evalResult.size * 0.5f * size + vertexRight * evalResult.size * slicePercent * size;
                     CalculateUVs(evalResult.percent, slicePercent);
-                    _tsMesh.uv[vertexIndex] = Vector2.one * 0.5f + (Vector2)(Quaternion.AngleAxis(uvRotation + 180f, Vector3.forward) * (Vector2.one * 0.5f - __uvs));
-                    _tsMesh.normals[vertexIndex] = vertexNormal;
-                    _tsMesh.colors[vertexIndex] = vertexColor;
+                    tsMesh.uv[vertexIndex] = Vector2.one * 0.5f + (Vector2)(Quaternion.AngleAxis(uvRotation, Vector3.forward) * (Vector2.one * 0.5f - uvs));
+                    tsMesh.normals[vertexIndex] = vertexNormal;
+                    tsMesh.colors[vertexIndex] = vertexColor;
                     vertexIndex++;
                 }
             }

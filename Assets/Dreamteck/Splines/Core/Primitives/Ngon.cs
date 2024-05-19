@@ -18,13 +18,14 @@ namespace Dreamteck.Splines.Primitives
         {
             base.Generate();
             closed = true;
-            CreatePoints(sides, SplinePoint.Type.SmoothMirrored);
+            CreatePoints(sides + 1, SplinePoint.Type.SmoothMirrored);
             for (int i = 0; i < sides; i++)
             {
                 float percent = (float)i / sides;
-                Vector3 pos = Quaternion.AngleAxis(360f * percent, Vector3.forward) * Vector3.up * radius;
+                Vector3 pos = Quaternion.AngleAxis(360f * percent, Vector3.up) * Vector3.forward * radius;
                 points[i].SetPosition(pos);
             }
+            points[points.Length - 1] = points[0];
         }
     }
 }

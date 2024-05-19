@@ -10,9 +10,9 @@
         [System.Serializable]
         public class ScaleKey : Key
         {
-            public Vector3 scale = Vector3.one;
+            public Vector2 scale = Vector2.one;
 
-            public ScaleKey(double f, double t) : base(f, t)
+            public ScaleKey(double f, double t, MeshScaleModifier modifier) : base(f, t, modifier)
             {
             }
         }
@@ -38,16 +38,17 @@
             keys = new List<ScaleKey>();
             for (int i = 0; i < input.Count; i++)
             {
+                input[i].modifier = this;
                 keys.Add((ScaleKey)input[i]);
             }
         }
 
         public void AddKey(double f, double t)
         {
-            keys.Add(new ScaleKey(f, t));
+            keys.Add(new ScaleKey(f, t, this));
         }
 
-        public override void Apply(ref SplineSample result)
+        public override void Apply(SplineSample result)
         {
             if (keys.Count == 0)
             {
@@ -55,22 +56,21 @@
             }
             for (int i = 0; i < keys.Count; i++)
             {
-                result.size += keys[i].Evaluate(result.percent) * keys[i].scale.magnitude * blend;
+                result.size += keys[i].Evaluate(result.percent) * keys[i].scale.magnitude;
             }
         }
 
-        public Vector3 GetScale(SplineSample sample)
+        public Vector2 GetScale(SplineSample sample)
         {
-            Vector3 scale = Vector3.one;
+            Vector2 scale = Vector2.one;
             for (int i = 0; i < keys.Count; i++)
             {
                 float lerp = keys[i].Evaluate(sample.percent);
-                Vector3 scaleMultiplier = Vector3.Lerp(Vector3.one, keys[i].scale, lerp);
+                Vector2 scaleMultiplier = Vector2.Lerp(Vector2.one, keys[i].scale, lerp);
                 scale.x *= scaleMultiplier.x;
                 scale.y *= scaleMultiplier.y;
-                scale.z *= scaleMultiplier.z;
             }
-            return Vector3.Lerp(Vector3.one, scale, blend);
+            return scale;
         }
     }
 }

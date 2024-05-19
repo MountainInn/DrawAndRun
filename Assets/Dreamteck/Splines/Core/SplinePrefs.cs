@@ -8,10 +8,10 @@ namespace Dreamteck.Splines
 {
     public static class SplinePrefs
     {
+        public enum DuplicationDirection { Forward, Backward }
         private static bool loaded = false;
-        public static Spline.Direction duplicationDirection = Spline.Direction.Forward;
+        public static DuplicationDirection duplicationDirection = DuplicationDirection.Forward;
         public static bool defaultAlwaysDraw = false;
-        public static SplineComputer.EditorUpdateMode defaultEditorUpdateMode = SplineComputer.EditorUpdateMode.Default;
         public static bool defaultShowThickness = false;
         public static bool default2D = false;
         public static bool startInCreationMode = false;
@@ -57,7 +57,6 @@ namespace Dreamteck.Splines
             defaultComputerSpace = (SplineComputer.Space)EditorGUILayout.EnumPopup("Space", defaultComputerSpace);
             defaultType = (Spline.Type)EditorGUILayout.EnumPopup("Type", defaultType);
             defaultAlwaysDraw = EditorGUILayout.Toggle("Always draw", defaultAlwaysDraw);
-            defaultEditorUpdateMode = (SplineComputer.EditorUpdateMode)EditorGUILayout.EnumPopup("Default Editor Update Mode", defaultEditorUpdateMode);
             defaultShowThickness = EditorGUILayout.Toggle("Show thickness", defaultShowThickness);
             default2D = EditorGUILayout.Toggle("2D Mode", default2D);
             defaultColor = EditorGUILayout.ColorField("Spline color", defaultColor);
@@ -69,19 +68,18 @@ namespace Dreamteck.Splines
             EditorGUILayout.LabelField("Editor", EditorStyles.boldLabel);
             highlightColor = EditorGUILayout.ColorField("Highlight color", highlightColor);
             highlightContentColor = EditorGUILayout.ColorField("Highlight content color", highlightContentColor);
-            duplicationDirection = (Spline.Direction)EditorGUILayout.EnumPopup("Duplicate Direction", duplicationDirection);
+            duplicationDirection = (DuplicationDirection)EditorGUILayout.EnumPopup("Duplicate Direction", duplicationDirection);
             showPointNumbers = EditorGUILayout.Toggle("Show point numbers", showPointNumbers);
 
             if (GUILayout.Button("Use Defaults", GUILayout.Width(120)))
             {
-                duplicationDirection = Spline.Direction.Forward;
+                duplicationDirection = DuplicationDirection.Forward;
                 defaultAlwaysDraw = false;
-                defaultEditorUpdateMode = SplineComputer.EditorUpdateMode.Default;
                 defaultShowThickness = false;
                 default2D = false;
                 startInCreationMode = true;
                 defaultColor = Color.white;
-                highlightColor = new Color(0.0313f, 0.737f, 0.796f, 1f);
+                highlightColor = new Color(0f, 0.564f, 1f, 1f);
                 highlightContentColor = new Color(1f, 1f, 1f, 0.95f);
                 showPointNumbers = false;
                 defaultComputerSpace = SplineComputer.Space.Local;
@@ -96,7 +94,6 @@ namespace Dreamteck.Splines
         public static void LoadPrefs()
         {
             defaultAlwaysDraw = EditorPrefs.GetBool("Dreamteck.Splines.defaultAlwaysDraw", false);
-            defaultEditorUpdateMode = (SplineComputer.EditorUpdateMode) EditorPrefs.GetInt("Dreamteck.Splines.defaultEditorUpdateMode", 0);
             defaultShowThickness = EditorPrefs.GetBool("Dreamteck.Splines.defaultShowThickness", false);
             default2D = EditorPrefs.GetBool("Dreamteck.Splines.default2D", false);
             startInCreationMode = EditorPrefs.GetBool("Dreamteck.Splines.startInCreationMode", true);
@@ -105,9 +102,9 @@ namespace Dreamteck.Splines
             defaultColor = LoadColor("Dreamteck.Splines.defaultColor", Color.white);
             highlightColor = LoadColor("Dreamteck.Splines.highlightColor", new Color(0f, 0.564f, 1f, 1f));
             highlightContentColor = LoadColor("Dreamteck.Splines.highlightContentColor", new Color(1f, 1f, 1f, 0.95f));
-            defaultComputerSpace = (SplineComputer.Space)EditorPrefs.GetInt("Dreamteck.Splines.defaultComputerSpace", 1);
+            defaultComputerSpace = (SplineComputer.Space)EditorPrefs.GetInt("Dreamteck.Splines.defaultComputerSpace", 0);
             defaultType = (Spline.Type)EditorPrefs.GetInt("Dreamteck.Splines.defaultType", 0);
-            duplicationDirection = (Spline.Direction)EditorPrefs.GetInt("Dreamteck.Splines.duplicationDirection", 0);
+            duplicationDirection = (DuplicationDirection)EditorPrefs.GetInt("Dreamteck.Splines.duplicationDirection", 0);
             createPointSize = EditorPrefs.GetFloat("Dreamteck.Splines.createPointSize", 1f);
             createPointColor = LoadColor("Dreamteck.Splines.createPointColor", Color.white);
             loaded = true;
@@ -130,9 +127,7 @@ namespace Dreamteck.Splines
 
         public static void SavePrefs()
         {
-            EditorPrefs.SetBool("Dreamteck.Splines.startInCreationMode", startInCreationMode);
             EditorPrefs.SetBool("Dreamteck.Splines.defaultAlwaysDraw", defaultAlwaysDraw);
-            EditorPrefs.SetInt("Dreamteck.Splines.defaultEditorUpdateMode", (int)defaultEditorUpdateMode);
             EditorPrefs.SetBool("Dreamteck.Splines.defaultShowThickness", defaultShowThickness);
             EditorPrefs.SetBool("Dreamteck.Splines.default2D", default2D);
             EditorPrefs.SetBool("Dreamteck.Splines.showPointNumbers", showPointNumbers);

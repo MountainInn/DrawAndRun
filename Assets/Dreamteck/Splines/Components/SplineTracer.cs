@@ -20,6 +20,9 @@ namespace Dreamteck.Splines
             }
         }
 
+        SplineTrigger[] triggerInvokeQueue = new SplineTrigger[0];
+        List<NodeConnection> nodeConnectionQueue = new List<NodeConnection>();
+        int addTriggerIndex = 0;
         public enum PhysicsMode { Transform, Rigidbody, Rigidbody2D }
         public PhysicsMode physicsMode
         {
@@ -59,20 +62,7 @@ namespace Dreamteck.Splines
             }
         }
 
-        public bool dontLerpDirection
-        {
-            get { return _dontLerpDirection; }
-            set
-            {
-                if (value != _dontLerpDirection)
-                {
-                    _dontLerpDirection = value;
-                    ApplyMotion();
-                }
-            }
-        }
-
-        public virtual Spline.Direction direction
+        public Spline.Direction direction
         {
             get { return _direction; }
             set
@@ -94,10 +84,6 @@ namespace Dreamteck.Splines
         [SerializeField]
         [HideInInspector]
         protected Spline.Direction _direction = Spline.Direction.Forward;
-
-        [SerializeField]
-        [HideInInspector]
-        protected bool _dontLerpDirection = false;
 
         [SerializeField]
         [HideInInspector]
@@ -123,42 +109,35 @@ namespace Dreamteck.Splines
         [HideInInspector]
         protected SplineSample _finalResult = new SplineSample();
 
+        private bool setPercentOnRebuild = false;
+        private double targetPercentOnRebuild = 0.0;
+
         public delegate void JunctionHandler(List<NodeConnection> passed);
 
         public event JunctionHandler onNode;
         public event EmptySplineHandler onMotionApplied;
 
-        private SplineTrigger[] triggerInvokeQueue = new SplineTrigger[0];
-        private List<NodeConnection> nodeConnectionQueue = new List<NodeConnection>();
-        private int addTriggerIndex = 0;
-
         private const double MIN_DELTA = 0.000001;
+
 
 #if UNITY_EDITOR
         public override void EditorAwake()
         {
             base.EditorAwake();
             RefreshTargets();
-            ApplyMotion();
         }
-#endif 
-
-        protected override void Awake()
-        {
-            base.Awake();
-            RefreshTargets();
-        }
+#endif
 
         protected virtual void Start()
         {
-
+            RefreshTargets();
         }
 
         public virtual void SetPercent(double percent, bool checkTriggers = false, bool handleJunctions = false)
         {
             if (sampleCount == 0) return;
             double lastPercent = _result.percent;
-            Evaluate(percent, ref _result);
+            Evaluate(percent, _result);
             ApplyMotion();
             if (checkTriggers)
             {
@@ -171,15 +150,11 @@ namespace Dreamteck.Splines
             }
         }
 
-        public double GetPercent()
-        {
-            return _result.percent;
-        }
-
         public virtual void SetDistance(float distance, bool checkTriggers = false, bool handleJunctions = false)
         {
+            if (sampleCount == 0) return;
             double lastPercent = _result.percent;
-            Evaluate(Travel(0.0, distance, Spline.Direction.Forward), ref _result);
+            Evaluate(Travel(0.0, distance, Spline.Direction.Forward), _result);
             ApplyMotion();
             if (checkTriggers)
             {
@@ -189,6 +164,15 @@ namespace Dreamteck.Splines
             if (handleJunctions)
             {
                 CheckNodes(lastPercent, _result.percent);
+            }
+        }
+
+        protected override void PostBuild()
+        {
+            if (setPercentOnRebuild)
+            {
+                SetPercent(targetPercentOnRebuild);
+                setPercentOnRebuild = false;
             }
         }
 
@@ -209,23 +193,22 @@ namespace Dreamteck.Splines
 
         protected void ApplyMotion()
         {
-            if (sampleCount == 0) return;
-            ModifySample(ref _result, ref _finalResult);
-            if (_dontLerpDirection)
-            {
-                double unclippedPercent = UnclipPercent(_result.percent);
-                int index;
-                double lerp;
-                spline.GetSamplingValues(unclippedPercent, out index, out lerp);
-                _finalResult.forward = spline[index].forward;
-                _finalResult.up = spline[index].up;
-            }
-
+            ModifySample(_result, _finalResult);
             motion.targetUser = this;
             motion.splineResult = _finalResult;
             if (applyDirectionRotation) motion.direction = _direction;
             else motion.direction = Spline.Direction.Forward;
 
+#if UNITY_EDITOR
+                if (!Application.isPlaying)
+            {
+                if (targetTransform == null) RefreshTargets();
+                if (targetTransform == null) return;
+                motion.ApplyTransform(targetTransform);
+                if (onMotionApplied != null) onMotionApplied();
+                return;
+            }
+#endif
             switch (_physicsMode)
             {
                 case PhysicsMode.Transform:
@@ -295,12 +278,7 @@ namespace Dreamteck.Splines
             }
             else if (to > 1.0 - MIN_DELTA && from < to)
             {
-                int pointCount = spline.pointCount - 1;
-                if (spline.isClosed)
-                {
-                    pointCount = spline.pointCount;
-                }
-                NodeConnection junction = GetJunction(pointCount);
+                NodeConnection junction = GetJunction(spline.pointCount - 1);
                 if (junction != null) nodeConnectionQueue.Add(junction);
             }
         }
